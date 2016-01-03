@@ -11,9 +11,9 @@ class ArduinoControl(object):
         self._ser.write(command)
         ans = self._ser.readline()
         print "received: ",ans
-        time.sleep(0.5)
+        #time.sleep(0.5)
 
-    def _dist(self):
+    def _dists(self):
         while True:
             header = str(self._ser.readline())
             #print header[2]
@@ -38,10 +38,29 @@ class ArduinoControl(object):
         stopByte  = struct.pack('<i',stop)[0]
         self._sendCommand(startByte)
         self._sendCommand(stopByte)
-        return self._dist()
+        return self._dists()
+
+    def dist(self):
+        command = 'd'
+        self._sendCommand(command)
+        dist = float(self._ser.readline())
+        return dist
+
+    def running(self):
+        command = 'r'
+        self._sendCommand(command)
+        running = int(self._ser.readline())
+        if running == 1:
+            return True
+        else:
+            return False
+        
+
+
     def heading(self):
         command = 'h'
         self._sendCommand(command)
         heading = float(self._ser.readline())
         time.sleep(0.5)
         return heading
+

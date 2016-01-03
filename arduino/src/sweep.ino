@@ -21,6 +21,60 @@ const int startDist = 90;
 int currentDist = 0;
 int analogPin = 0;
 int val = 0;
+// button with ISR
+int sensePin = 2;
+int ledPin = 13;
+
+volatile bool running = false;
+ int buttonState;             // the current reading from the input pin
+int lastButtonState = LOW;   // the previous reading from the input pin
+
+// the following variables are long's because the time, measured in miliseconds,
+// will quickly become a bigger number than can be stored in an int.
+long lastDebounceTime = 0;  // the last time the output pin was toggled
+long debounceDelay = 50;    // the debounce time; increase if the output flickers
+
+void checkButtonISR(){
+  // read the state of the switch into a local variable:
+  int reading = digitalRead(sensePin);
+
+  // check to see if you just pressed the button
+  // (i.e. the input went from LOW to HIGH),  and you've waited
+  // long enough since the last press to ignore any noise:
+
+  // If the switch changed, due to noise or pressing:
+  if (reading != lastButtonState) {
+    // reset the debouncing timer
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    // whatever the reading is at, it's been there for longer
+    // than the debounce delay, so take it as the actual current state:
+
+    // if the button state has changed:
+    if (reading != buttonState) {
+      buttonState = reading;
+
+      // only toggle the LED if the new button state is HIGH
+      if (buttonState == LOW) {
+        running = !running;
+      }
+    }
+  }
+
+  // set the LED:
+  digitalWrite(ledPin, running);
+
+  // save the reading.  Next time through the loop,
+  // it'll be the lastButtonState:
+  lastButtonState = reading;
+
+
+
+}
+
+
 Servo myservo;  // create servo object to control a servo
 // twelve servo objects can be created on most boards
 
@@ -56,9 +110,11 @@ void setup() {
    	  dists[i/DPHI] = maxDist;
   }
   mag.begin();
-  pinMode(13, OUTPUT);
-  digitalWrite(13,LOW);
-
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin,LOW);
+  //attachInterrupt(digitalPinToInterrupt(sensePin), checkButtonISR, CHANGE);
+  pinMode(sensePin,INPUT_PULLUP);
+  //attachInterrupt(0, checkButtonISR, FALLING);
 
 }
 float distance(int val)
@@ -113,9 +169,9 @@ void sweep(const int &start, const int &stop){
       for(int i=start;i<stop;i+=DPHI)
       {
 	myservo.write(i);
-	digitalWrite(13,LOW);
+	//digitalWrite(ledPin,LOW);
 	delay(timeDelay/2);
-	digitalWrite(13,HIGH);
+	//digitalWrite(ledPin,HIGH);
 	delay(timeDelay/2);
 	val = analogRead(analogPin);
 	dists[i/DPHI] = distance(val);
@@ -123,10 +179,10 @@ void sweep(const int &start, const int &stop){
      } 
      if(stop<start){
       for(int i=start-1;i>=stop;i-=DPHI) {
-      	      digitalWrite(13,LOW);
+	//digitalWrite(ledPin,LOW);
 	       myservo.write(i);
                delay(timeDelay/2);
-	       digitalWrite(13,HIGH);
+	       // digitalWrite(ledPin,HIGH);
 	       delay(timeDelay/2);
                val = analogRead(analogPin);
                dists[i/DPHI] = distance(val);
@@ -150,7 +206,7 @@ int stopByte = 0;
 char command =' ';
 float heading = 0.0;
 void loop() {
-  
+  checkButtonISR();
   if(Serial.available() > 0)
     {
       command = (char)(Serial.read());
@@ -168,10 +224,21 @@ void loop() {
 	sWriteDists();  
 	
       }
+      if(command == 'd'){
+	 val = analogRead(analogPin);
+	 float myDist = distance(val);
+	 Serial.println(myDist);
+      }
       
       if(command == 'h'){
 	heading = getHeading();
 	Serial.println(heading);
+      }
+      if(command == 'r') {
+	if(running)
+	  Serial.println("1");
+	else
+	  Serial.println("0");
       }
     }
 }
